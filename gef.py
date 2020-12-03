@@ -2850,6 +2850,8 @@ def get_info_files():
 def process_lookup_address(address):
     """Look up for an address in memory.
     Return an Address object if found, None otherwise."""
+    # [PATCHED]
+    address &= int(get_memory_alignment(in_bits=True)*'1', 2)
     if not is_alive():
         err("Process is not running")
         return None
@@ -7667,8 +7669,12 @@ class ContextCommand(GenericCommand):
         nb_insn_prev = self.get_setting("nb_lines_code_prev")
         use_capstone = self.has_setting("use_capstone") and self.get_setting("use_capstone")
         cur_insn_color = get_gef_setting("theme.disassemble_current_instruction")
-        pc = current_arch.pc
-        bp_locations = [b.location for b in gdb.breakpoints() if b.location.startswith("*")]
+        pc = current_arch.pc & int(get_memory_alignment(in_bits=True)*'1', 2)
+        # [Patched]
+        if gdb.breakpoints():
+            bp_locations = [b.location for b in gdb.breakpoints() if b.location.startswith("*")]
+        else:
+            bp_locations = []
 
         frame = gdb.selected_frame()
         arch = frame.architecture()
@@ -7729,6 +7735,7 @@ class ContextCommand(GenericCommand):
         return
 
     def context_args(self):
+        
         insn = gef_current_instruction(current_arch.pc)
         if not current_arch.is_call(insn):
             return
@@ -7739,7 +7746,7 @@ class ContextCommand(GenericCommand):
             4: "DWORD",
             8: "QWORD",
         }
-
+        
         if insn.operands[-1].startswith(self.size2type[current_arch.ptrsize]+" PTR"):
             target = "*" + insn.operands[-1].split()[-1]
         elif "$"+insn.operands[0] in current_arch.all_registers:
@@ -7844,9 +7851,12 @@ class ContextCommand(GenericCommand):
         if not nb_argument:
             if is_x86_32():
                 nb_argument = len(parameter_set)
-            else:
+            # [PATCHED]
+            elif parameter_set:
                 nb_argument = max(function_parameters.index(p)+1 for p in parameter_set)
-
+            else:
+                nb_argument = 0
+                
         args = []
         for i in range(nb_argument):
             _key, _values = current_arch.get_ith_parameter(i, in_func=False)
@@ -7887,7 +7897,11 @@ class ContextCommand(GenericCommand):
             return
 
         file_base_name = os.path.basename(symtab.filename)
-        bp_locations = [b.location for b in gdb.breakpoints() if file_base_name in b.location]
+        # [Patched]
+        if gdb.breakpoints():
+            bp_locations = [b.location for b in gdb.breakpoints() if file_base_name in b.location]
+        else:
+            bp_locations = []
 
         nb_line = self.get_setting("nb_lines_code")
         fn = symtab.filename
