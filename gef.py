@@ -7776,21 +7776,25 @@ class ContextCommand(GenericCommand):
     def print_arguments_from_symbol(self, function_name, symbol):
         """If symbols were found, parse them and print the argument adequately."""
         args = []
-
         for i, f in enumerate(symbol.type.fields()):
-            _value = current_arch.get_ith_parameter(i, in_func=False)[1]
-            _value = RIGHT_ARROW.join(DereferenceCommand.dereference_from(_value))
-            _name = f.name or "var_{}".format(i)
-            _type = f.type.name or self.size2type[f.type.sizeof]
-            args.append("{} {} = {}".format(_type, _name, _value))
-
+            try:
+                _value = current_arch.get_ith_parameter(i, in_func=False)[1]
+                _value = RIGHT_ARROW.join(DereferenceCommand.dereference_from(_value))
+                _name = f.name or "var_{}".format(i)
+                _type = f.type.name or self.size2type[f.type.sizeof]
+                args.append("{} {} = {}".format(_type, _name, _value))
+            except IndexError:
+                # When args count over 6.
+                args.append("...")
+                break
+        
         self.context_title("arguments")
-
+        
         if not args:
             gef_print("{} (<void>)".format(function_name))
             return
-
-        gef_print("{} (".format(function_name))
+        
+        gef_print("{} (".format(function_name)) 
         gef_print("   " + ",\n   ".join(args))
         gef_print(")")
         return
